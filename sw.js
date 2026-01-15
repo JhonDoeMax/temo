@@ -1,4 +1,3 @@
-// sw.js - Service Worker for CORS proxy
 const CACHE_NAME = 'yt-dlp-cache-v1';
 
 self.addEventListener('install', (event) => {
