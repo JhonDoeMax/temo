@@ -237,6 +237,62 @@ async function extractFormats() {
         try {
             console.log('Calling yt-dlp extract_info...');
             const result = await pyodide.runPythonAsync(`
+# Patch networking right before yt-dlp usage
+import yt_dlp.networking._urllib as urllib_handler
+import js
+
+original_send = urllib_handler.RequestHandler._send
+
+async def patched_send(self, request):
+    url = request.url
+    print(f"🎯 INTERCEPTED yt-dlp request: {url}")
+
+    if any(domain in url for domain in ['youtube.com', 'googlevideo.com', 'youtubei.googleapis.com', 'ytimg.com']):
+        print(f"🚀 Using CORS proxy for: {url}")
+        try:
+            options = {
+                'method': request.method or 'GET',
+                'headers': dict(request.headers) if hasattr(request, 'headers') else {},
+                'body': request.data
+            }
+
+            js_response = await js.fetchProxy(url, options)
+
+            class MockResponse:
+                def __init__(self, js_resp):
+                    self.status = js_resp.status
+                    self.msg = js_resp.statusText
+                    self.headers = js_resp.headers
+                    self.fp = self
+
+                def read(self, amt=None):
+                    data = bytes(js_resp.body)
+                    return data if amt is None else data[:amt]
+
+                def readinto(self, b):
+                    raise NotImplementedError
+
+                def close(self):
+                    pass
+
+                def geturl(self):
+                    return url
+
+                def info(self):
+                    return self.headers
+
+            print(f"✅ Proxy response: {js_response.status}")
+            return MockResponse(js_response)
+
+        except Exception as e:
+            print(f"❌ Proxy failed: {e}")
+            return await original_send(self, request)
+    else:
+        return await original_send(self, request)
+
+urllib_handler.RequestHandler._send = patched_send
+
+# Now run yt-dlp
 import yt_dlp
 ydl = yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True, 'extract_flat': False})
 info = ydl.extract_info("""${url}""", download=False)
