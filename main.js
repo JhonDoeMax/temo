@@ -30,8 +30,8 @@ async function fetchProxy(url, options = {}) {
 
   let proxyUrl = url;
   if (isYouTubeRequest) {
-    // Use corsfix.com proxy
-    proxyUrl = `https://corsfix.com/${url}`;
+    // Use corsfix.com proxy with correct format
+    proxyUrl = `https://proxy.corsfix.com/?${encodeURIComponent(url)}`;
   }
 
   try {
