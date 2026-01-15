@@ -16,8 +16,18 @@ async function registerServiceWorker() {
 
 // JavaScript networking proxy for yt-dlp
 async function fetchProxy(url, options = {}) {
+  // Use CORS proxy for YouTube requests
+  const isYouTubeRequest = url.includes('youtube.com') || url.includes('googlevideo.com') ||
+                          url.includes('youtubei.googleapis.com') || url.includes('ytimg.com');
+
+  let proxyUrl = url;
+  if (isYouTubeRequest) {
+    // Use corsfix.com proxy
+    proxyUrl = `https://corsfix.com/${url}`;
+  }
+
   try {
-    const response = await fetch(url, {
+    const response = await fetch(proxyUrl, {
       method: options.method || 'GET',
       headers: options.headers || {},
       body: options.body,
@@ -40,6 +50,35 @@ async function fetchProxy(url, options = {}) {
     };
   } catch (error) {
     console.log('Fetch proxy error:', error);
+    // Fallback to direct request if proxy fails
+    if (isYouTubeRequest) {
+      try {
+        const directResponse = await fetch(url, {
+          method: options.method || 'GET',
+          headers: options.headers || {},
+          body: options.body,
+          mode: 'cors',
+          credentials: 'omit'
+        });
+
+        const headers = {};
+        for (let [key, value] of directResponse.headers.entries()) {
+          headers[key] = value;
+        }
+
+        const arrayBuffer = await directResponse.arrayBuffer();
+
+        return {
+          status: directResponse.status,
+          statusText: directResponse.statusText,
+          headers: headers,
+          body: arrayBuffer
+        };
+      } catch (directError) {
+        console.log('Direct fetch also failed:', directError);
+        throw directError;
+      }
+    }
     throw error;
   }
 }
