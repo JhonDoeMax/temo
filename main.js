@@ -150,71 +150,71 @@ async function main() {
         print('yt-dlp loaded')
     `);
 
-    // Monkey-patch urllib to use JavaScript fetch proxy
+    // Patch yt-dlp's networking directly
     await pyodide.runPythonAsync(`
-import sys
+import yt_dlp.networking
 import js
-import asyncio
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError
 
-class JSFetchResponse:
-    def __init__(self, js_response, url):
-        self.js_response = js_response
-        self.url = url
-        self.status = js_response.status
-        self.headers = js_response.headers
+# Monkey patch the urllib RequestHandler._send method
+original_send = yt_dlp.networking._urllib.RequestHandler._send
 
-    def read(self, amt=None):
-        data = bytes(self.js_response.body)
-        if amt is None:
-            return data
-        else:
-            return data[:amt]
+async def patched_send(self, request):
+    url = request.url
+    print(f"Intercepted yt-dlp request to: {url}")
 
-    def readinto(self, b):
-        raise NotImplementedError
+    # Check if it's a YouTube/Google request
+    if any(domain in url for domain in ['youtube.com', 'googlevideo.com', 'youtubei.googleapis.com', 'ytimg.com']):
+        print(f"Using proxy for: {url}")
+        try:
+            # Call our JavaScript proxy
+            options = {
+                'method': request.method,
+                'headers': dict(request.headers),
+                'body': request.data
+            }
 
-    def close(self):
-        pass
+            js_response = await js.fetchProxy(url, options)
 
-    def geturl(self):
-        return self.url
+            # Create a response object that yt-dlp expects
+            class MockResponse:
+                def __init__(self, js_resp):
+                    self.status = js_resp.status
+                    self.msg = js_resp.statusText
+                    self.headers = js_resp.headers
+                    self.fp = self
 
-async def urlopen_async(url, data=None, headers=None, **kwargs):
-    options = {
-        'method': 'POST' if data else 'GET',
-        'headers': headers or {},
-        'body': data
-    }
+                def read(self, amt=None):
+                    data = bytes(js_resp.body)
+                    if amt is None:
+                        return data
+                    return data[:amt]
 
-    try:
-        js_response = await js.fetchProxy(url, options)
-        return JSFetchResponse(js_response, url)
-    except Exception as e:
-        print(f"Async fetch failed: {e}")
-        raise
+                def readinto(self, b):
+                    raise NotImplementedError
 
-# Synchronous wrapper (this won't work perfectly but let's try)
-def urlopen_cors(url, data=None, headers=None, **kwargs):
-    # Try to run async in sync context - this will likely fail
-    try:
-        # This is a hack and probably won't work
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(urlopen_async(url, data, headers, **kwargs))
-        loop.close()
-        return result
-    except Exception as e:
-        print(f"CORS urlopen failed: {e}")
-        # Fallback to original
-        return urlopen(url, data, headers, **kwargs)
+                def close(self):
+                    pass
 
-# Patch urllib
-import urllib.request
-urllib.request.urlopen = urlopen_cors
+                def geturl(self):
+                    return url
 
-print('JavaScript fetch proxy CORS patch applied')
+                def info(self):
+                    return self.headers
+
+            return MockResponse(js_response)
+
+        except Exception as e:
+            print(f"Proxy failed: {e}")
+            # Fall back to original method
+            return await original_send(self, request)
+    else:
+        # Not a YouTube request, use original
+        return await original_send(self, request)
+
+# Apply the patch
+yt_dlp.networking._urllib.RequestHandler._send = patched_send
+
+print('yt-dlp networking layer patched')
     `);
 
     // Set up event listeners
