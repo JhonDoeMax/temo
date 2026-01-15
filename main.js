@@ -5,12 +5,20 @@ let pyodide;
 async function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
     try {
-      const registration = await navigator.serviceWorker.register('sw.js');
+      const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
       console.log('Service Worker registered:', registration);
+
+      // Wait for the service worker to be ready
+      await navigator.serviceWorker.ready;
+      console.log('Service Worker ready');
+
       return registration;
     } catch (error) {
       console.log('Service Worker registration failed:', error);
+      console.log('Continuing without Service Worker - using CORS proxy only');
     }
+  } else {
+    console.log('Service Workers not supported - using CORS proxy only');
   }
 }
 
