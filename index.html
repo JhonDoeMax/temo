@@ -9,7 +9,12 @@
 <body>
     <div class="container">
         <h1>yt-dlp WASM Downloader</h1>
-        <p>Download videos from YouTube and more without a server!</p>
+        <p>Proof-of-concept: yt-dlp running in your browser via Pyodide</p>
+        <div class="status-info">
+            <strong>✅ Working:</strong> Pyodide + yt-dlp loading, UI, CORS infrastructure<br>
+            <strong>❌ Limitation:</strong> Browser networking restrictions prevent downloads<br>
+            <strong>🔄 Status:</strong> MVP complete, server-side proxy needed for full functionality
+        </div>
         <input type="url" id="url-input" placeholder="Enter video URL (e.g., YouTube)">
         <button id="extract-btn">Extract Formats</button>
         <div id="formats-container" style="display: none;">
