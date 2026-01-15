@@ -30,8 +30,8 @@ async function fetchProxy(url, options = {}) {
 
   let proxyUrl = url;
   if (isYouTubeRequest) {
-    // Use corsfix.com proxy with correct format
-    proxyUrl = `https://proxy.corsfix.com/?${encodeURIComponent(url)}`;
+    // Use corsfix.com proxy - try without encoding first
+    proxyUrl = `https://proxy.corsfix.com/?${url}`;
   }
 
   try {
@@ -82,10 +82,38 @@ async function fetchProxy(url, options = {}) {
           headers: headers,
           body: arrayBuffer
         };
-      } catch (directError) {
-        console.log('Direct fetch also failed:', directError);
+    } catch (directError) {
+      console.log('Direct fetch also failed:', directError);
+      // Try a different CORS proxy as fallback
+      try {
+        const altProxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
+        console.log('Trying alternative proxy:', altProxyUrl);
+        const altResponse = await fetch(altProxyUrl, {
+          method: options.method || 'GET',
+          headers: options.headers || {},
+          body: options.body,
+          mode: 'cors',
+          credentials: 'omit'
+        });
+
+        const headers = {};
+        for (let [key, value] of altResponse.headers.entries()) {
+          headers[key] = value;
+        }
+
+        const arrayBuffer = await altResponse.arrayBuffer();
+
+        return {
+          status: altResponse.status,
+          statusText: altResponse.statusText,
+          headers: headers,
+          body: arrayBuffer
+        };
+      } catch (altError) {
+        console.log('Alternative proxy also failed:', altError);
         throw directError;
       }
+    }
     }
     throw error;
   }
