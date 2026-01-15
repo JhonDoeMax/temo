@@ -237,26 +237,35 @@ async function extractFormats() {
         try {
             console.log('Calling yt-dlp extract_info...');
             const result = await pyodide.runPythonAsync(`
-# Patch networking right before yt-dlp usage
-import yt_dlp.networking._urllib as urllib_handler
+# Patch urllib directly after yt-dlp import
+import yt_dlp
+import urllib.request
 import js
 
-original_send = urllib_handler.RequestHandler._send
+original_urlopen = urllib.request.urlopen
 
-async def patched_send(self, request):
-    url = request.url
-    print(f"🎯 INTERCEPTED yt-dlp request: {url}")
+def patched_urlopen(url, data=None, headers=None, **kwargs):
+    url_str = str(url)
+    print(f"🎯 INTERCEPTED urllib request: {url_str}")
 
-    if any(domain in url for domain in ['youtube.com', 'googlevideo.com', 'youtubei.googleapis.com', 'ytimg.com']):
-        print(f"🚀 Using CORS proxy for: {url}")
+    if any(domain in url_str for domain in ['youtube.com', 'googlevideo.com', 'youtubei.googleapis.com', 'ytimg.com']):
+        print(f"🚀 Using CORS proxy for: {url_str}")
         try:
+            # Convert headers dict to proper format
+            header_dict = {}
+            if hasattr(url, 'headers'):
+                for k, v in url.headers.items():
+                    header_dict[k] = v
+            if headers:
+                header_dict.update(headers)
+
             options = {
-                'method': request.method or 'GET',
-                'headers': dict(request.headers) if hasattr(request, 'headers') else {},
-                'body': request.data
+                'method': 'POST' if data else 'GET',
+                'headers': header_dict,
+                'body': data
             }
 
-            js_response = await js.fetchProxy(url, options)
+            js_response = await js.fetchProxy(url_str, options)
 
             class MockResponse:
                 def __init__(self, js_resp):
@@ -264,10 +273,10 @@ async def patched_send(self, request):
                     self.msg = js_resp.statusText
                     self.headers = js_resp.headers
                     self.fp = self
+                    self._data = bytes(js_resp.body)
 
                 def read(self, amt=None):
-                    data = bytes(js_resp.body)
-                    return data if amt is None else data[:amt]
+                    return self._data if amt is None else self._data[:amt]
 
                 def readinto(self, b):
                     raise NotImplementedError
@@ -276,7 +285,7 @@ async def patched_send(self, request):
                     pass
 
                 def geturl(self):
-                    return url
+                    return url_str
 
                 def info(self):
                     return self.headers
@@ -286,14 +295,13 @@ async def patched_send(self, request):
 
         except Exception as e:
             print(f"❌ Proxy failed: {e}")
-            return await original_send(self, request)
+            return original_urlopen(url, data, headers, **kwargs)
     else:
-        return await original_send(self, request)
+        return original_urlopen(url, data, headers, **kwargs)
 
-urllib_handler.RequestHandler._send = patched_send
+urllib.request.urlopen = patched_urlopen
 
 # Now run yt-dlp
-import yt_dlp
 ydl = yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True, 'extract_flat': False})
 info = ydl.extract_info("""${url}""", download=False)
 formats_list = info.get('formats', [])
