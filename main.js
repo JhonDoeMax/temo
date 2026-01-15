@@ -24,6 +24,8 @@ async function registerServiceWorker() {
 
 // JavaScript networking proxy for yt-dlp
 async function fetchProxy(url, options = {}) {
+  console.log('fetchProxy called with URL:', url);
+
   // Use CORS proxy for YouTube requests
   const isYouTubeRequest = url.includes('youtube.com') || url.includes('googlevideo.com') ||
                           url.includes('youtubei.googleapis.com') || url.includes('ytimg.com');
@@ -32,9 +34,13 @@ async function fetchProxy(url, options = {}) {
   if (isYouTubeRequest) {
     // Use corsfix.com proxy - try without encoding first
     proxyUrl = `https://proxy.corsfix.com/?${url}`;
+    console.log('Using corsfix proxy:', proxyUrl);
+  } else {
+    console.log('Not a YouTube request, using direct URL');
   }
 
   try {
+    console.log('Making fetch request to:', proxyUrl);
     const response = await fetch(proxyUrl, {
       method: options.method || 'GET',
       headers: options.headers || {},
@@ -43,12 +49,15 @@ async function fetchProxy(url, options = {}) {
       credentials: 'omit'
     });
 
+    console.log('Response status:', response.status, response.statusText);
+
     const headers = {};
     for (let [key, value] of response.headers.entries()) {
       headers[key] = value;
     }
 
     const arrayBuffer = await response.arrayBuffer();
+    console.log('Response body size:', arrayBuffer.byteLength);
 
     return {
       status: response.status,
@@ -61,6 +70,7 @@ async function fetchProxy(url, options = {}) {
     // Fallback to direct request if proxy fails
     if (isYouTubeRequest) {
       try {
+        console.log('Trying direct fetch for:', url);
         const directResponse = await fetch(url, {
           method: options.method || 'GET',
           headers: options.headers || {},
@@ -82,38 +92,38 @@ async function fetchProxy(url, options = {}) {
           headers: headers,
           body: arrayBuffer
         };
-    } catch (directError) {
-      console.log('Direct fetch also failed:', directError);
-      // Try a different CORS proxy as fallback
-      try {
-        const altProxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
-        console.log('Trying alternative proxy:', altProxyUrl);
-        const altResponse = await fetch(altProxyUrl, {
-          method: options.method || 'GET',
-          headers: options.headers || {},
-          body: options.body,
-          mode: 'cors',
-          credentials: 'omit'
-        });
+      } catch (directError) {
+        console.log('Direct fetch also failed:', directError);
+        // Try a different CORS proxy as fallback
+        try {
+          const altProxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
+          console.log('Trying alternative proxy:', altProxyUrl);
+          const altResponse = await fetch(altProxyUrl, {
+            method: options.method || 'GET',
+            headers: options.headers || {},
+            body: options.body,
+            mode: 'cors',
+            credentials: 'omit'
+          });
 
-        const headers = {};
-        for (let [key, value] of altResponse.headers.entries()) {
-          headers[key] = value;
+          const headers = {};
+          for (let [key, value] of altResponse.headers.entries()) {
+            headers[key] = value;
+          }
+
+          const arrayBuffer = await altResponse.arrayBuffer();
+
+          return {
+            status: altResponse.status,
+            statusText: altResponse.statusText,
+            headers: headers,
+            body: arrayBuffer
+          };
+        } catch (altError) {
+          console.log('Alternative proxy also failed:', altError);
+          throw directError;
         }
-
-        const arrayBuffer = await altResponse.arrayBuffer();
-
-        return {
-          status: altResponse.status,
-          statusText: altResponse.statusText,
-          headers: headers,
-          body: arrayBuffer
-        };
-      } catch (altError) {
-        console.log('Alternative proxy also failed:', altError);
-        throw directError;
       }
-    }
     }
     throw error;
   }
@@ -220,10 +230,12 @@ async function extractFormats() {
 
     try {
         document.getElementById('status').textContent = 'Extracting formats...';
+        console.log('Starting format extraction for URL:', url);
         let formats;
 
         // Try yt-dlp first
         try {
+            console.log('Calling yt-dlp extract_info...');
             const result = await pyodide.runPythonAsync(`
 import yt_dlp
 ydl = yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True, 'extract_flat': False})
@@ -231,6 +243,7 @@ info = ydl.extract_info("""${url}""", download=False)
 formats_list = info.get('formats', [])
             `);
             formats = pyodide.globals.get('formats_list');
+            console.log('yt-dlp extraction successful, formats found:', formats.length);
         } catch (ytDlpError) {
             console.log('yt-dlp failed:', ytDlpError);
             throw new Error('Failed to extract formats. CORS or network issue.');
