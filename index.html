@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>yt-dlp WASM Downloader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>yt-dlp WASM Downloader</h1>
+        <p>Download videos from YouTube and more without a server!</p>
+        <input type="url" id="url-input" placeholder="Enter video URL (e.g., YouTube)">
+        <button id="extract-btn">Extract Formats</button>
+        <div id="formats-container" style="display: none;">
+            <h2>Select Format</h2>
+            <select id="format-select"></select>
+            <button id="download-btn">Download</button>
+        </div>
+        <div id="progress-container" style="display: none;">
+            <progress id="progress-bar" value="0" max="100"></progress>
+            <span id="progress-text">0%</span>
+        </div>
+        <div id="status"></div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.29.1/full/pyodide.js"></script>
+    <script type="module" src="main.js"></script>
+</body>
+</html>
