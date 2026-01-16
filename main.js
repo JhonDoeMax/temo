@@ -30,11 +30,11 @@ async function fetchProxy(url, options = {}) {
   const isYouTubeRequest = url.includes('youtube.com') || url.includes('googlevideo.com') ||
                           url.includes('youtubei.googleapis.com') || url.includes('ytimg.com');
 
-  let proxyUrl = url;
+  let proxyUrl = `https://proxy.corsfix.com/?${url}`;
+  console.log('Using corsfix proxy:', proxyUrl);
   if (isYouTubeRequest) {
     // Use corsfix.com proxy - try without encoding first
-    proxyUrl = `https://proxy.corsfix.com/?${url}`;
-    console.log('Using corsfix proxy:', proxyUrl);
+
   } else {
     console.log('Not a YouTube request, using direct URL');
   }
