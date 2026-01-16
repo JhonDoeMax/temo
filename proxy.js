@@ -29,9 +29,9 @@ export async function fetchProxy(url, options = {}) {
 
   let proxyUrl = url;
   if (isYouTubeRequest) {
-    // Use corsfix.com proxy - try without encoding first
-    proxyUrl = `https://proxy.corsfix.com/?${url}`;
-    console.log('Using corsfix proxy:', proxyUrl);
+    // Use cors-anywhere proxy
+    proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
+    console.log('Using cors-anywhere proxy:', proxyUrl);
   } else {
     console.log('Not a YouTube request, using direct URL');
   }
@@ -40,7 +40,7 @@ export async function fetchProxy(url, options = {}) {
     console.log('Making fetch request to:', proxyUrl);
     const response = await fetch(proxyUrl, {
       method: options.method || 'GET',
-      headers: options.headers || {},
+      headers: { ...(options.headers || {}), 'X-Requested-With': 'XMLHttpRequest' },
       body: options.body,
       mode: 'cors',
       credentials: 'omit'
