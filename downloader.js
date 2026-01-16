@@ -33,6 +33,7 @@ export async function extractFormats(pyodide, fetchProxy) {
 import yt_dlp
 import urllib.request
 import js
+import asyncio
 
 original_urlopen = urllib.request.urlopen
 
@@ -57,7 +58,11 @@ def patched_urlopen(url, data=None, headers=None, **kwargs):
                 'body': data
             }
 
-            js_response = await js.fetchProxy(url_str, options)
+            async def _do_request():
+                js_response = await js.fetchProxy(url_str, options)
+                return js_response
+
+            js_response = asyncio.get_event_loop().run_until_complete(_do_request())
 
             class MockResponse:
                 def __init__(self, js_resp):
