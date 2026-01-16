@@ -29,13 +29,14 @@ export async function extractFormats(pyodide, fetchProxy) {
         try {
             console.log('Calling yt-dlp extract_info...');
             const result = await pyodide.runPythonAsync(`
+# Patch urllib directly after yt-dlp import
 import yt_dlp
 import urllib.request
 import js
 
 original_urlopen = urllib.request.urlopen
 
-async def patched_urlopen(url, data=None, headers=None, **kwargs):
+def patched_urlopen(url, data=None, headers=None, **kwargs):
     url_str = str(url)
     print(f"🎯 INTERCEPTED urllib request: {url_str}")
 
@@ -95,9 +96,9 @@ urllib.request.urlopen = patched_urlopen
 # Now run yt-dlp
 ydl = yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True, 'extract_flat': False})
 info = ydl.extract_info("""${url}""", download=False)
-info.get('formats', [])
+formats_list = info.get('formats', [])
             `);
-            formats = result;
+            formats = pyodide.globals.get('formats_list');
             console.log('yt-dlp extraction successful, formats found:', formats.length);
         } catch (ytDlpError) {
             console.log('yt-dlp failed:', ytDlpError);
@@ -122,7 +123,7 @@ info.get('formats', [])
     }
 }
 
-export async function downloadVideo(pyodide, fetchProxy) {
+export async function downloadVideo(pyodide) {
     const url = document.getElementById('url-input').value;
     const formatId = document.getElementById('format-select').value;
 
@@ -164,11 +165,6 @@ files[0] if files else None
             if (filePath) {
                 const fileData = pyodide.FS.readFile('/tmp/' + filePath, { encoding: 'binary' });
                 stream = new Blob([fileData]);
-
-                // Clean up
-                pyodide.FS.unlink('/tmp/' + filePath);
-            } else {
-                throw new Error('No video file found after download');
             }
         } catch (ytDlpError) {
             console.log('yt-dlp download failed:', ytDlpError);
@@ -184,7 +180,6 @@ files[0] if files else None
         URL.revokeObjectURL(downloadUrl);
 
         document.getElementById('status').textContent = 'Download complete!';
-        document.getElementById('progress-container').style.display = 'none';
     } catch (error) {
         document.getElementById('status').textContent = 'Download failed: ' + error.message;
         console.error(error);
