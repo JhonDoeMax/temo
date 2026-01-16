@@ -1,14 +1,18 @@
 {
-  "name": "yt-dlp-wasm-downloader",
+  "name": "temo",
   "version": "1.0.0",
-  "type": "module",
-  "main": "main.js",
+  "main": "index.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
   "devDependencies": {
-    "vite": "^5.0.0"
+    "vite": "^7.3.1"
   }
 }

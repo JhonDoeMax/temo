@@ -20,14 +20,12 @@ async function main() {
     document.getElementById('status').textContent = 'Loading yt-dlp...';
 
     try {
-        // Install yt-dlp - NOTE: careful with indentation in Python string
-        const pythonCode = `
+    // Install yt-dlp
+    await pyodide.runPythonAsync(`
         import micropip
         await micropip.install('yt-dlp')
 print('✅ yt-dlp installed')
-        `.trim(); // .trim() removes leading/trailing whitespace
-
-        await pyodide.runPythonAsync(pythonCode);
+    `);
     } catch (error) {
         console.error('Failed to install yt-dlp:', error);
         document.getElementById('status').textContent = 'Failed to install yt-dlp: ' + error.message;
