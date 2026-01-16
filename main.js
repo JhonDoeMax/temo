@@ -25,76 +25,9 @@ async function main() {
         print('yt-dlp loaded')
     `);
 
-    // Patch yt-dlp's networking directly
-    await pyodide.runPythonAsync(`
-import yt_dlp.networking
-import js
-
-# Monkey patch the urllib RequestHandler._send method
-original_send = yt_dlp.networking._urllib.RequestHandler._send
-
-async def patched_send(self, request):
-    url = request.url
-    print(f"Intercepted yt-dlp request to: {url}")
-
-    # Check if it's a YouTube/Google request
-    if any(domain in url for domain in ['youtube.com', 'googlevideo.com', 'youtubei.googleapis.com', 'ytimg.com']):
-        print(f"Using proxy for: {url}")
-        try:
-            # Call our JavaScript proxy
-            options = {
-                'method': request.method,
-                'headers': dict(request.headers),
-                'body': request.data
-            }
-
-            js_response = await js.fetchProxy(url, options)
-
-            # Create a response object that yt-dlp expects
-            class MockResponse:
-                def __init__(self, js_resp):
-                    self.status = js_resp.status
-                    self.msg = js_resp.statusText
-                    self.headers = js_resp.headers
-                    self.fp = self
-
-                def read(self, amt=None):
-                    data = bytes(js_resp.body)
-                    if amt is None:
-                        return data
-                    return data[:amt]
-
-                def readinto(self, b):
-                    raise NotImplementedError
-
-                def close(self):
-                    pass
-
-                def geturl(self):
-                    return url
-
-                def info(self):
-                    return self.headers
-
-            return MockResponse(js_response)
-
-        except Exception as e:
-            print(f"Proxy failed: {e}")
-            # Fall back to original method
-            return await original_send(self, request)
-    else:
-        # Not a YouTube request, use original
-        return await original_send(self, request)
-
-# Apply the patch
-yt_dlp.networking._urllib.RequestHandler._send = patched_send
-
-print('yt-dlp networking layer patched')
-    `);
-
     // Set up event listeners
     document.getElementById('extract-btn').addEventListener('click', () => extractFormats(pyodide, fetchProxy));
-    document.getElementById('download-btn').addEventListener('click', () => downloadVideo(pyodide));
+    document.getElementById('download-btn').addEventListener('click', () => downloadVideo(pyodide, fetchProxy));
     document.getElementById('check-proxy-btn').addEventListener('click', () => checkCorsProxy(fetchProxy));
 
     document.getElementById('status').textContent = 'Ready to download!';
