@@ -220,6 +220,7 @@ print('yt-dlp networking layer patched')
     // Set up event listeners
     document.getElementById('extract-btn').addEventListener('click', extractFormats);
     document.getElementById('download-btn').addEventListener('click', downloadVideo);
+    document.getElementById('check-proxy-btn').addEventListener('click', checkCorsProxy);
 
     document.getElementById('status').textContent = 'Ready to download!';
 }
@@ -327,6 +328,23 @@ formats_list = info.get('formats', [])
         document.getElementById('status').textContent = 'Formats extracted!';
     } catch (error) {
         document.getElementById('status').textContent = 'Error extracting formats: ' + error.message;
+        console.error(error);
+    }
+}
+
+async function checkCorsProxy() {
+    document.getElementById('status').textContent = 'Testing CORS proxy...';
+    try {
+        // Test the proxy with a simple request to httpbin.org
+        const testUrl = 'https://httpbin.org/get';
+        const response = await fetchProxy(testUrl);
+        if (response.status === 200) {
+            document.getElementById('status').textContent = '✅ CORS proxy is working!';
+        } else {
+            document.getElementById('status').textContent = '❌ CORS proxy returned status ' + response.status;
+        }
+    } catch (error) {
+        document.getElementById('status').textContent = '❌ CORS proxy test failed: ' + error.message;
         console.error(error);
     }
 }
