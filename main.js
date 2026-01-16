@@ -99,6 +99,74 @@ def patched_send(self, request):
 yt_dlp.networking._urllib.RequestHandler._send = patched_send
 
 print('yt-dlp networking layer patched')
+
+# Also patch urllib.request.urlopen globally
+import urllib.request
+
+original_urlopen = urllib.request.urlopen
+
+def patched_urlopen(url, data=None, headers=None, **kwargs):
+    url_str = str(url)
+    print(f"🎯 INTERCEPTED urllib request: {url_str}")
+
+    if any(domain in url_str for domain in ['youtube.com', 'googlevideo.com', 'youtubei.googleapis.com', 'ytimg.com']):
+        print(f"🚀 Using CORS proxy for: {url_str}")
+        try:
+            # Convert headers dict to proper format
+            header_dict = {}
+            if hasattr(url, 'headers'):
+                for k, v in url.headers.items():
+                    header_dict[k] = v
+            if headers:
+                header_dict.update(headers)
+
+            options = {
+                'method': 'POST' if data else 'GET',
+                'headers': header_dict,
+                'body': data
+            }
+
+            async def _do_request():
+                js_response = await js.fetchProxy(url_str, options)
+                return js_response
+
+            js_response = asyncio.get_event_loop().run_until_complete(_do_request())
+
+            class MockResponse:
+                def __init__(self, js_resp):
+                    self.status = js_resp.status
+                    self.msg = js_resp.statusText
+                    self.headers = js_resp.headers
+                    self.fp = self
+                    self._data = bytes(js_resp.body)
+
+                def read(self, amt=None):
+                    return self._data if amt is None else self._data[:amt]
+
+                def readinto(self, b):
+                    raise NotImplementedError
+
+                def close(self):
+                    pass
+
+                def geturl(self):
+                    return url_str
+
+                def info(self):
+                    return self.headers
+
+            print(f"✅ Proxy response: {js_response.status}")
+            return MockResponse(js_response)
+
+        except Exception as e:
+            print(f"❌ Proxy failed: {e}")
+            return original_urlopen(url, data, headers, **kwargs)
+    else:
+        return original_urlopen(url, data, headers, **kwargs)
+
+urllib.request.urlopen = patched_urlopen
+
+print('urllib.request patched')
     `);
 
     // Set up event listeners
