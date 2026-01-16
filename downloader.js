@@ -3,7 +3,7 @@ export async function checkCorsProxy(fetchProxy) {
     document.getElementById('status').textContent = 'Testing CORS proxy...';
     try {
         // Test the proxy with a simple request to httpbin.org
-        const testUrl = 'https://httpbin.org/get';
+        const testUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
         const response = await fetchProxy(testUrl);
         if (response.status === 200) {
             document.getElementById('status').textContent = '✅ CORS proxy is working!';
