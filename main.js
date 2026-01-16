@@ -29,11 +29,12 @@ async function main() {
     await pyodide.runPythonAsync(`
 import yt_dlp.networking
 import js
+import asyncio
 
 # Monkey patch the urllib RequestHandler._send method
 original_send = yt_dlp.networking._urllib.RequestHandler._send
 
-async def patched_send(self, request):
+def patched_send(self, request):
     url = request.url
     print(f"Intercepted yt-dlp request to: {url}")
 
@@ -48,7 +49,11 @@ async def patched_send(self, request):
                 'body': request.data
             }
 
-            js_response = await js.fetchProxy(url, options)
+            async def _do_fetch():
+                js_response = await js.fetchProxy(url, options)
+                return js_response
+
+            js_response = asyncio.get_event_loop().run_until_complete(_do_fetch())
 
             # Create a response object that yt-dlp expects
             class MockResponse:
@@ -81,10 +86,14 @@ async def patched_send(self, request):
         except Exception as e:
             print(f"Proxy failed: {e}")
             # Fall back to original method
-            return await original_send(self, request)
+            async def _orig_send():
+                return await original_send(self, request)
+            return asyncio.get_event_loop().run_until_complete(_orig_send())
     else:
         # Not a YouTube request, use original
-        return await original_send(self, request)
+        async def _orig_send():
+            return await original_send(self, request)
+        return asyncio.get_event_loop().run_until_complete(_orig_send())
 
 # Apply the patch
 yt_dlp.networking._urllib.RequestHandler._send = patched_send
